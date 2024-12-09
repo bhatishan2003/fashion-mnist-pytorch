@@ -12,14 +12,22 @@ We train a model over Fashion-MNIST dataset.
 
 - Activate Virtual Env
 
-  ```bash
-  .venv/Scripts/activate
-  ```
+  - Windows/PowerShell:
+
+    ```bash
+    .venv/Scripts/activate
+    ```
+
+  - Bash/Linux:
+
+    ```bash
+    source .venv/bin/activate
+    ```
 
 - Install requirements
 
   ```bash
-  pip install -r requirments.txt
+  pip install -r requirements.txt
   ```
 
 ## Usage
@@ -38,5 +46,3 @@ We train a model over Fashion-MNIST dataset.
   ```bash
   python main.py --mode eval
   ```
-
-## Contact

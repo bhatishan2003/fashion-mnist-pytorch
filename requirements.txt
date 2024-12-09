@@ -1,6 +1,6 @@
-torch
 numpy
-torchvision
-tqdm
 pre-commit
 ruff
+torch
+torchvision
+tqdm
