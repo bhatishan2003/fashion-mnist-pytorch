@@ -1,48 +1,85 @@
-# Fashion-MNIST-Pytorch
+# Fashion-MNIST with PyTorch
 
-We train a model over Fashion-MNIST dataset.
+Train a model using the Fashion-MNIST dataset with PyTorch.
 
 ## Installation
 
-- Create Virtual Env:
+1. **Create a Virtual Environment [Optional, but recommended]**
 
-  ```bash
-  python3 -m venv .venv
-  ```
+   Run the following command to create a [virtual environment](https://docs.python.org/3/library/venv.html):
 
-- Activate Virtual Env
+   ```bash
+   python3 -m venv .venv
+   ```
 
-  - Windows/PowerShell:
+   - **Activate:**
 
-    ```bash
-    .venv/Scripts/activate
-    ```
+     - **Windows (PowerShell):**
 
-  - Bash/Linux:
+     ```bash
+     .venv\Scripts\activate
+     ```
 
-    ```bash
-    source .venv/bin/activate
-    ```
+     - **Linux/Mac (Bash):**
 
-- Install requirements
+     ```bash
+     source .venv/bin/activate
+     ```
 
-  ```bash
-  pip install -r requirements.txt
-  ```
+   - **Deactivate:**
+     ```bash
+     deactivate
+     ```
+
+2. **Install Dependencies**
+
+   ```bash
+   pip install -r requirements.txt
+   ```
 
 ## Usage
 
-- Help:
+- Help
+
+  Displays the available options and usage details:
+
   ```bash
   python main.py --help
   ```
-- Train:
+
+- Train the model
+
+  Run training for a specified number of epochs (e.g., 10 epochs):
 
   ```bash
   python main.py --mode train --num_epochs 10
   ```
 
-- Eval:
+- Evaluate the trained model
+
   ```bash
   python main.py --mode eval
   ```
+
+## Development Notes
+
+- Pre-commit
+
+  We use pre-commit to automate linting of our codebase.
+
+  - Install hooks:
+    ```bash
+    pre-commit install
+    ```
+  - Run Hooks manually (optional):
+    ```bash
+    pre-commit run --all-files
+    ```
+
+- Ruff:
+
+  - Lint and format:
+    ```bash
+    ruff check --fix
+    ruff format
+    ```
