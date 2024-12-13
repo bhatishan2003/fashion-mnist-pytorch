@@ -168,8 +168,9 @@ cython_debug/
 .idea/
 .vscode/
 
-# Results
+# Results and Logs
 results/
+mlruns
 
 # Model
 *.pth
