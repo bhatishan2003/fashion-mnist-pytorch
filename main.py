@@ -3,6 +3,7 @@ import csv
 import os
 import random
 
+import mlflow
 import numpy as np
 import torch
 import torch.nn as nn
@@ -145,6 +146,8 @@ def get_args():
         default=False,
     )
     parser.add_argument("--no_cuda", action="store_true", help="Disable Cuda/GPU usage", default=False)
+    parser.add_argument("--use_mlflow", action="store_true", help="If enabled, uses mlflow for logging", default=False)
+    parser.add_argument("--mlflow_tracking_uri", type=str, default="file:./mlruns")
     args = parser.parse_args()
 
     # create run directory
@@ -207,6 +210,25 @@ def main():
     if args.mode == "train":
         optimizer = configure_optimizer(args.optimizer, model.parameters(), args.learning_rate)
 
+        # setup mlflow
+        if args.use_mlflow:
+            mlflow.set_tracking_uri(args.mlflow_tracking_uri)
+            mlflow.set_experiment(args.project_name)
+            mlflow.start_run()
+            mlflow.log_params(
+                {
+                    "seed": args.seed,
+                    "model_type": args.model_type,
+                    "hidden_size": args.hidden_size,
+                    "batch_size": args.batch_size,
+                    "num_epochs": args.num_epochs,
+                    "learning_rate": args.learning_rate,
+                    "disable_normalization": args.disable_normalization,
+                    "activation": args.activation,
+                    "optimizer": args.optimizer,
+                }
+            )
+
         # logging utility: we write our logs in a csv file
         logs_path = os.path.join(args.run_dir, "logs.csv")
         if os.path.exists(logs_path):
@@ -234,7 +256,7 @@ def main():
         # epoch training
         for epoch in range(epoch_start_num, args.num_epochs):
             model.train()
-            epoch_metrics = {"loss": []}
+            epoch_metrics = {"train-loss": []}
 
             with tqdm(total=len(train_loader)) as pbar:
                 pbar.set_description(f"Training Epoch: {epoch} | Batch Processing:")
@@ -250,33 +272,38 @@ def main():
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
-                    epoch_metrics["loss"].append(loss.item())
+                    epoch_metrics["train-loss"].append(loss.item())
 
                     # update progress bat
                     pbar.update(1)
 
-                # Normalize epoch loss
-                epoch_metrics["loss"] = np.mean(epoch_metrics["loss"])
+                # normalize
+                epoch_metrics["train-loss"] = np.mean(epoch_metrics["train-loss"])
 
-                # Validation metrics
-                val_metrics = evaluate(val_loader, model, args.device)
+                # Validation
+                for k, v in evaluate(val_loader, model, args.device).items():
+                    epoch_metrics[f"val-{k}"] = v
 
                 # Logging metrics
+                if args.use_mlflow:
+                    mlflow.log_metrics({**epoch_metrics, "epoch": epoch}, step=epoch)
                 msg = f"Training Epoch: {epoch} |"
-                msg += f" Train Loss: {epoch_metrics['loss']:.2f}, "
-                msg += f" Val Loss: {val_metrics['loss']:.2f},"
-                msg += f" Val Accuracy: {val_metrics['accuracy']:.2f} "
+                msg += ",".join(f"{k}: {v}" for k, v in epoch_metrics.items())
                 msg += " | Batch Processing "
                 pbar.set_description(msg)
 
                 # write metrics to csv
-                csv_logger_writer.writerow([epoch, epoch_metrics["loss"], val_metrics["loss"], val_metrics["accuracy"]])
+                csv_logger_writer.writerow(
+                    [epoch, epoch_metrics["train-loss"], epoch_metrics["val-loss"], epoch_metrics["val-accuracy"]]
+                )
 
             # Save the model
             torch.save({"optimizer": optimizer.state_dict(), "model": model.state_dict(), "epoch": epoch}, args.checkpoint_path)
 
         # close logging utility
         csv_logger_file.close()
+        if args.use_mlflow:
+            mlflow.end_run()
 
     elif args.mode == "eval":
         # Load and evaluate the model
