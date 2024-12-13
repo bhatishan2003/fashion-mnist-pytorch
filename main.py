@@ -63,9 +63,9 @@ class FullyConnectedNN(nn.Module):
 
 
 class FashionMNISTCNN(nn.Module):
-    def __init__(self, num_classes, activation):
+    def __init__(self, input_channels, num_classes, activation):
         super(FashionMNISTCNN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1)
+        self.conv1 = nn.Conv2d(input_channels, 32, kernel_size=3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
         self.fc1 = nn.Linear(64 * 7 * 7, 128)
         self.fc2 = nn.Linear(128, num_classes)
@@ -103,7 +103,7 @@ def get_activation_function(activation_name):
         raise ValueError(f"Incorrect activation entered: {activation_name}")
 
 
-def get_optimizer(optimizer_name, model_parameters, learning_rate):
+def configure_optimizer(optimizer_name, model_parameters, learning_rate):
     if optimizer_name == "sgd":
         return torch.optim.SGD(model_parameters, lr=learning_rate)
     elif optimizer_name == "adam":
@@ -205,7 +205,7 @@ def main():
 
     # Mode Operation
     if args.mode == "train":
-        optimizer = get_optimizer(args.optimizer, model.parameters(), args.learning_rate)
+        optimizer = configure_optimizer(args.optimizer, model.parameters(), args.learning_rate)
 
         # logging utility: we write our logs in a csv file
         logs_path = os.path.join(args.run_dir, "logs.csv")
