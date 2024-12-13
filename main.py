@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 
 
-def evaluate(data_loader, model):
+def evaluate(data_loader, model, device="cpu"):
     model.eval()
     predicted_labels = []
     target_labels = []
@@ -21,6 +21,8 @@ def evaluate(data_loader, model):
     with torch.no_grad():
         for batch in data_loader:
             images, labels = batch
+            images = images.to(device)
+            labels = labels.to(device)
             logits = model(images)
             loss = model.loss(logits, labels)
 
@@ -142,6 +144,7 @@ def get_args():
         help="If enabled and existing checkpoint exits, the experiment is resumed.",
         default=False,
     )
+    parser.add_argument("--no_cuda", action="store_true", help="Disable Cuda/GPU usage", default=False)
     args = parser.parse_args()
 
     # create run directory
@@ -153,6 +156,9 @@ def get_args():
 
     # model-paths
     args.checkpoint_path = os.path.join(args.run_dir, "checkpoint.pth")
+
+    # device selection
+    args.device = "cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu"
 
     return args
 
@@ -222,6 +228,9 @@ def main():
             else:
                 print("No existing checkpoint found! Start experiment from scratch.")
 
+        # device assignment
+        model = model.to(args.device)
+
         # epoch training
         for epoch in range(epoch_start_num, args.num_epochs):
             model.train()
@@ -230,11 +239,14 @@ def main():
             with tqdm(total=len(train_loader)) as pbar:
                 pbar.set_description(f"Training Epoch: {epoch} | Batch Processing:")
                 for batch in train_loader:
+                    # batch formulate and forward
                     images, labels = batch
+                    images = images.to(args.device)
+                    labels = labels.to(args.device)
                     logits = model(images)
-                    loss = model.loss(logits, labels)
 
                     # Update the model
+                    loss = model.loss(logits, labels)
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
@@ -247,7 +259,7 @@ def main():
                 epoch_metrics["loss"] = np.mean(epoch_metrics["loss"])
 
                 # Validation metrics
-                val_metrics = evaluate(val_loader, model)
+                val_metrics = evaluate(val_loader, model, args.device)
 
                 # Logging metrics
                 msg = f"Training Epoch: {epoch} |"
@@ -268,9 +280,9 @@ def main():
 
     elif args.mode == "eval":
         # Load and evaluate the model
-
         model.load_state_dict(torch.load(args.checkpoint_path)["model"])
-        test_metrics = evaluate(test_loader, model)
+        model = model.to(args.device)
+        test_metrics = evaluate(test_loader, model, args.device)
         print(
             f"Test Loss: {test_metrics['loss']:.4f}",
             f"Test Accuracy: {test_metrics['accuracy']:.4f}",
