@@ -1,4 +1,7 @@
 import argparse
+import csv
+import os
+import random
 
 import numpy as np
 import torch
@@ -10,7 +13,7 @@ from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 
 
-def metrics(data_loader, model):
+def evaluate(data_loader, model):
     model.eval()
     predicted_labels = []
     target_labels = []
@@ -32,146 +35,249 @@ def metrics(data_loader, model):
     }
 
 
-class FashionMnistModel(nn.Module):
-    def __init__(self, input_size, hidden_size, num_classes):
+class FullyConnectedNN(nn.Module):
+    def __init__(self, input_size, hidden_size, num_classes, activation):
         super().__init__()
-        self.input_size = input_size
+        self.hidden_Size = hidden_size
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.fc3 = nn.Linear(hidden_size, num_classes)
+        self.activation = activation
 
     def forward(self, x):
-        x = x.view(-1, self.input_size)  # Flatten the images, use class attribute
-        x = self.fc1(x)
-        x = F.relu(x)
-        x = self.fc2(x)
-        x = F.relu(x)
+        x = x.view(-1, self.fc1.in_features)  # Flatten the images
+        x = self.activation(self.fc1(x))
+        x = self.activation(self.fc2(x))
         x = self.fc3(x)
         return x  # logits
 
     def predict(self, x):
         logits = self.forward(x)
-        return F.softmax(logits)  # probabilities
+        return F.softmax(logits, dim=1)  # probabilities
 
     @staticmethod
     def loss(logits, target_labels):
         return F.cross_entropy(logits, target_labels)
 
 
-def main():
-    # Create the parser
-    parser = argparse.ArgumentParser(
-        description="Fashion Mnist Training and Evaluation."
-    )
-    parser.add_argument(
-        "--mode",
-        type=str,
-        help="Mode of operation",
-        default="train",
-    )
-    parser.add_argument(
-        "--hidden_size",
-        type=int,
-        help="Hidden Size of hidden layers of model",
-        default=256,
-    )
+class FashionMNISTCNN(nn.Module):
+    def __init__(self, num_classes, activation):
+        super(FashionMNISTCNN, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)
+        self.fc1 = nn.Linear(64 * 7 * 7, 128)
+        self.fc2 = nn.Linear(128, num_classes)
+        self.activation = activation
 
+    def forward(self, x):
+        x = self.activation(self.conv1(x))
+        x = F.max_pool2d(x, kernel_size=2)
+        x = self.activation(self.conv2(x))
+        x = F.max_pool2d(x, kernel_size=2)
+        x = x.view(x.size(0), -1)  # Flatten
+        x = self.activation(self.fc1(x))
+        x = self.fc2(x)
+        return x
+
+    def predict(self, x):
+        logits = self.forward(x)
+        return F.softmax(logits, dim=1)  # probabilities
+
+    @staticmethod
+    def loss(logits, target_labels):
+        return F.cross_entropy(logits, target_labels)
+
+
+def get_activation_function(activation_name):
+    if activation_name == "relu":
+        return F.relu
+    elif activation_name == "leaky_relu":
+        return F.leaky_relu
+    elif activation_name == "tanh":
+        return torch.tanh
+    elif activation_name == "sigmoid":
+        return torch.sigmoid
+    else:
+        raise ValueError(f"Incorrect activation entered: {activation_name}")
+
+
+def get_optimizer(optimizer_name, model_parameters, learning_rate):
+    if optimizer_name == "sgd":
+        return torch.optim.SGD(model_parameters, lr=learning_rate)
+    elif optimizer_name == "adam":
+        return torch.optim.Adam(model_parameters, lr=learning_rate)
+    elif optimizer_name == "rmsprop":
+        return torch.optim.RMSprop(model_parameters, lr=learning_rate)
+    elif optimizer_name == "adagrad":
+        return torch.optim.Adagrad(model_parameters, lr=learning_rate)
+    else:
+        raise ValueError(f"Incorrect optimizer entered: {optimizer_name}")
+
+
+def get_args():
+    parser = argparse.ArgumentParser(description="FashionMNIST Training and Evaluation.")
+    parser.add_argument("--project_name", type=str, default="fashion-mnist-pytorch", help="Name of project")
+    parser.add_argument("--mode", type=str, default="train", choices=["train", "eval"], help="Mode of operation")
+    parser.add_argument("--seed", type=int, default=10, help="Seed to control randomness")
+    parser.add_argument("--model_type", type=str, default="fc", choices=["cnn", "fc"], help="Choice of model")
+    parser.add_argument("--hidden_size", type=int, default=256, help="Hidden size (for FC model only)")
+    parser.add_argument("--batch_size", type=int, default=64, help="Batch size")
+    parser.add_argument("--num_epochs", type=int, default=10, help="Number of epochs")
+    parser.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate for optimizer")
+    parser.add_argument("--disable_normalization", action="store_true", help="Disable dataset normalization", default=False)
     parser.add_argument(
-        "--batch_size",
-        type=int,
-        help="Batcg size of dataset",
-        default=64,
+        "--activation",
+        type=str,
+        default="relu",
+        choices=["relu", "leaky_relu", "tanh", "sigmoid"],
+        help="Activation function for network",
     )
     parser.add_argument(
-        "--num_epochs",
-        type=int,
-        help="Total number of epochs used to train",
-        default=10,
+        "--optimizer", type=str, default="adam", choices=["sgd", "adam", "rmsprop", "adagrad"], help="Optimizer"
     )
+    parser.add_argument("--experiment_root_dir", type=str, default=os.path.join(os.getcwd(), "results"))
     parser.add_argument(
-        "--learning_rate",
-        type=float,
-        help="Learning rate of optimizer",
-        default=0.0001,
+        "--resume",
+        action="store_true",
+        help="If enabled and existing checkpoint exits, the experiment is resumed.",
+        default=False,
     )
     args = parser.parse_args()
 
-    # data load
-    transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
-    )
-    train_dataset = torchvision.datasets.FashionMNIST(
-        root="~/datasets", train=True, transform=transform, download=True
-    )
-    test_dataset = torchvision.datasets.FashionMNIST(
-        root="~/datasets", train=False, transform=transform, download=True
-    )
+    # create run directory
+    run_name = f"seed-{args.seed}-model_type-{args.model_type}-hidden_size-{args.hidden_size}"
+    run_name += f"-batch_size-{args.batch_size}-num_epochs-{args.num_epochs}-learning_rate-{args.learning_rate}"
+    run_name += f"-disable_normalization-{args.disable_normalization}-activation-{args.activation}-optimizer-{args.optimizer}"
+    args.run_dir = os.path.join(args.experiment_root_dir, run_name)
+    os.makedirs(args.run_dir, exist_ok=True)
+
+    # model-paths
+    args.checkpoint_path = os.path.join(args.run_dir, "checkpoint.pth")
+
+    return args
+
+
+def main():
+    # Command line arguments for experiment
+    args = get_args()
+
+    # Seed randomness
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+
+    # Data transformation operation
+    transform_operations = [transforms.ToTensor()]
+    if not args.disable_normalization:
+        transform_operations.append(transforms.Normalize((0.5,), (0.5,)))
+    transform = transforms.Compose(transform_operations)
+
+    # Data download and loader creation
+    train_dataset = torchvision.datasets.FashionMNIST(root="~/datasets", train=True, transform=transform, download=True)
+    test_dataset = torchvision.datasets.FashionMNIST(root="~/datasets", train=False, transform=transform, download=True)
     train_size = int(0.8 * len(train_dataset))
     val_size = len(train_dataset) - train_size
     train_dataset, val_dataset = random_split(train_dataset, [train_size, val_size])
-    train_loader = DataLoader(
-        dataset=train_dataset, batch_size=args.batch_size, shuffle=True
-    )
-    val_loader = DataLoader(
-        dataset=val_dataset, batch_size=args.batch_size, shuffle=False
-    )
-    test_loader = DataLoader(
-        dataset=test_dataset, batch_size=args.batch_size, shuffle=False
-    )
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
     num_classes = len(test_dataset.classes)
-    input_size = train_dataset[0][0].flatten().shape[0]
 
-    # model initialization
-    model = FashionMnistModel(input_size, args.hidden_size, num_classes)
+    # Model selection
+    activation = get_activation_function(args.activation)
+    if args.model_type == "cnn":
+        model = FashionMNISTCNN(input_channels=1, num_classes=num_classes, activation=activation)
+    elif args.model_type == "fc":
+        model = FullyConnectedNN(
+            input_size=train_dataset[0][0].flatten().shape[0],
+            hidden_size=args.hidden_size,
+            num_classes=num_classes,
+            activation=activation,
+        )
+    else:
+        raise ValueError(f"Invalid model type: {args.model_type}")
 
-    # operation mode
+    # Mode Operation
     if args.mode == "train":
-        optimizer = torch.optim.SGD(model.parameters(), lr=args.learning_rate)
-        for num_epoch in range(args.num_epochs):
+        optimizer = get_optimizer(args.optimizer, model.parameters(), args.learning_rate)
+
+        # logging utility: we write our logs in a csv file
+        logs_path = os.path.join(args.run_dir, "logs.csv")
+        if os.path.exists(logs_path):
+            csv_logger_file = open(logs_path, "a", newline="")
+            csv_logger_writer = csv.writer(csv_logger_file)
+        else:
+            csv_logger_file = open(logs_path, "w", newline="")
+            csv_logger_writer = csv.writer(csv_logger_file)
+            csv_logger_writer.writerow(["Epoch", "Train Loss", "Val Loss", "Val Accuracy"])
+
+        # resume experiment
+        epoch_start_num = 0
+        if args.resume:
+            if os.path.exists(args.checkpoint_path):
+                checkpoint_dict = torch.load(args.checkpoint_path)
+                model.load_state_dict(checkpoint_dict["model"])
+                optimizer.load_state_dict(checkpoint_dict["optimizer"])
+                epoch_start_num = checkpoint_dict["epoch"] + 1
+            else:
+                print("No existing checkpoint found! Start experiment from scratch.")
+
+        # epoch training
+        for epoch in range(epoch_start_num, args.num_epochs):
             model.train()
             epoch_metrics = {"loss": []}
-            for batch in tqdm(
-                train_loader, desc=f"Epoch {num_epoch} | Batch Processing"
-            ):
-                images, labels = batch
-                logits = model(images)
-                loss = model.loss(logits, labels)
 
-                # update model
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                epoch_metrics["loss"].append(loss.item())
+            with tqdm(total=len(train_loader)) as pbar:
+                pbar.set_description(f"Training Epoch: {epoch} | Batch Processing:")
+                for batch in train_loader:
+                    images, labels = batch
+                    logits = model(images)
+                    loss = model.loss(logits, labels)
 
-            # normalize epoch loss
-            epoch_metrics["loss"] = np.mean(epoch_metrics["loss"])
+                    # Update the model
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+                    epoch_metrics["loss"].append(loss.item())
 
-            # estimate validation metrics
-            val_metrics = metrics(val_loader, model)
+                    # update progress bat
+                    pbar.update(1)
 
-            # log metrics
-            print(
-                f"Epoch #{num_epoch}",
-                f"Train Loss: {epoch_metrics['loss']}",
-                f"Val Loss: {val_metrics['loss']}",
-                f"Val Accuracy: {val_metrics['accuracy']}",
-            )
+                # Normalize epoch loss
+                epoch_metrics["loss"] = np.mean(epoch_metrics["loss"])
 
-            # save model
-            torch.save(model.state_dict(), "fashion_mnist.pth")
+                # Validation metrics
+                val_metrics = evaluate(val_loader, model)
+
+                # Logging metrics
+                msg = f"Training Epoch: {epoch} |"
+                msg += f" Train Loss: {epoch_metrics['loss']:.2f}, "
+                msg += f" Val Loss: {val_metrics['loss']:.2f},"
+                msg += f" Val Accuracy: {val_metrics['accuracy']:.2f} "
+                msg += " | Batch Processing "
+                pbar.set_description(msg)
+
+                # write metrics to csv
+                csv_logger_writer.writerow([epoch, epoch_metrics["loss"], val_metrics["loss"], val_metrics["accuracy"]])
+
+            # Save the model
+            torch.save({"optimizer": optimizer.state_dict(), "model": model.state_dict(), "epoch": epoch}, args.checkpoint_path)
+
+        # close logging utility
+        csv_logger_file.close()
 
     elif args.mode == "eval":
-        # evaluation code
-        model.eval()
-        model.load_state_dict(torch.load("fashion_mnist.pth"))
-        test_metrics = metrics(test_loader, model)
+        # Load and evaluate the model
+
+        model.load_state_dict(torch.load(args.checkpoint_path)["model"])
+        test_metrics = evaluate(test_loader, model)
         print(
-            f"Test Loss: {test_metrics['loss']}",
-            f"Test Accuracy: {test_metrics['accuracy']}",
+            f"Test Loss: {test_metrics['loss']:.4f}",
+            f"Test Accuracy: {test_metrics['accuracy']:.4f}",
         )
 
     else:
-        raise ValueError(f"{args.mode} is invalid.")
+        raise ValueError(f"Invalid mode: {args.mode}")
 
 
 if __name__ == "__main__":
