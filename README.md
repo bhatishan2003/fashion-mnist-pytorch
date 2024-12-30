@@ -1,6 +1,13 @@
-# Fashion-MNIST with PyTorch
+# Fashion-MNIST with PyTorch <!-- omit in toc -->
 
-Train a model using the Fashion-MNIST dataset with PyTorch.
+Train a model using the [Fashion-MNIST dataset](https://github.com/zalandoresearch/fashion-mnist) with PyTorch.
+![Image of Fashion MNIST dataset](assets/dataset_image.png)
+
+## Table of Contents <!-- omit in toc -->
+
+- [Installation](#installation)
+- [Usage](#usage)
+- [Development Notes](#development-notes)
 
 ## Installation
 
