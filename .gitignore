@@ -171,6 +171,7 @@ cython_debug/
 # Results and Logs
 results/
 mlruns
+wandb
 
 # Model
 *.pth

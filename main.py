@@ -13,6 +13,8 @@ import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 
+import wandb
+
 
 def evaluate(data_loader, model, device="cpu"):
     model.eval()
@@ -115,7 +117,7 @@ def get_args():
     parser = argparse.ArgumentParser(description="FashionMNIST Training and Evaluation.")
     parser.add_argument("--project_name", type=str, default="fashion-mnist-pytorch", help="Name of project")
     parser.add_argument("--mode", type=str, default="train", choices=["train", "eval"], help="Mode of operation")
-    parser.add_argument("--seed", type=int, default=10, help="Seed to control randomness")
+    parser.add_argument("--seed", type=int, default=0, help="Seed to control randomness")
     parser.add_argument("--model_type", type=str, default="fc", choices=["cnn", "fc"], help="Choice of model")
     parser.add_argument("--hidden_size", type=int, default=256, help="Hidden size (for FC model only)")
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size")
@@ -142,6 +144,7 @@ def get_args():
     parser.add_argument("--no_cuda", action="store_true", help="Disable Cuda/GPU usage", default=False)
     parser.add_argument("--use_mlflow", action="store_true", help="If enabled, uses mlflow for logging", default=False)
     parser.add_argument("--mlflow_tracking_uri", type=str, default="file:./mlruns")
+    parser.add_argument("--use_wandb", action="store_true", help="If enabled, uses wandb for logging", default=False)
     args = parser.parse_args()
 
     # create run directory
@@ -205,23 +208,24 @@ def main():
         optimizer = configure_optimizer(args.optimizer, model.parameters(), args.learning_rate)
 
         # setup mlflow
+        config = {
+            "seed": args.seed,
+            "model_type": args.model_type,
+            "hidden_size": args.hidden_size,
+            "batch_size": args.batch_size,
+            "num_epochs": args.num_epochs,
+            "learning_rate": args.learning_rate,
+            "disable_normalization": args.disable_normalization,
+            "activation": args.activation,
+            "optimizer": args.optimizer,
+        }
         if args.use_mlflow:
             mlflow.set_tracking_uri(args.mlflow_tracking_uri)
             mlflow.set_experiment(args.project_name)
             mlflow.start_run()
-            mlflow.log_params(
-                {
-                    "seed": args.seed,
-                    "model_type": args.model_type,
-                    "hidden_size": args.hidden_size,
-                    "batch_size": args.batch_size,
-                    "num_epochs": args.num_epochs,
-                    "learning_rate": args.learning_rate,
-                    "disable_normalization": args.disable_normalization,
-                    "activation": args.activation,
-                    "optimizer": args.optimizer,
-                }
-            )
+            mlflow.log_params(**config)
+        if args.use_wandb:
+            wandb.init(project=args.project_name, config=config)
 
         # logging utility: we write our logs in a csv file
         logs_path = os.path.join(args.run_dir, "logs.csv")
@@ -281,6 +285,8 @@ def main():
                 # Logging metrics
                 if args.use_mlflow:
                     mlflow.log_metrics({**epoch_metrics, "epoch": epoch}, step=epoch)
+                if args.use_wandb:
+                    wandb.log({**epoch_metrics, "epoch": epoch})
                 msg = f"Training Epoch: {epoch} |"
                 msg += ",".join(f"{k}: {round(v,2)}" for k, v in epoch_metrics.items())
                 msg += " | Batch Processing "
@@ -293,10 +299,13 @@ def main():
 
             # Save the model
             torch.save({"optimizer": optimizer.state_dict(), "model": model.state_dict(), "epoch": epoch}, args.checkpoint_path)
+
         # close logging utility
         csv_logger_file.close()
         if args.use_mlflow:
             mlflow.end_run()
+        if args.use_wandb:
+            wandb.finish()
 
     elif args.mode == "eval":
         # Load and evaluate the model
