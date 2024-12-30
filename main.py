@@ -92,16 +92,10 @@ class FashionMNISTCNN(nn.Module):
 
 
 def get_activation_function(activation_name):
-    if activation_name == "relu":
-        return F.relu
-    elif activation_name == "leaky_relu":
-        return F.leaky_relu
-    elif activation_name == "tanh":
-        return torch.tanh
-    elif activation_name == "sigmoid":
-        return torch.sigmoid
+    if activation_name in ["relu", "leaky_relu", "tanh", "sigmoid"]:
+        return getattr(F, activation_name)
     else:
-        raise ValueError(f"Incorrect activation entered: {activation_name}")
+        raise ValueError(f"Unsupported activation function entered: {activation_name}")
 
 
 def configure_optimizer(optimizer_name, model_parameters, learning_rate):
@@ -288,7 +282,7 @@ def main():
                 if args.use_mlflow:
                     mlflow.log_metrics({**epoch_metrics, "epoch": epoch}, step=epoch)
                 msg = f"Training Epoch: {epoch} |"
-                msg += ",".join(f"{k}: {v}" for k, v in epoch_metrics.items())
+                msg += ",".join(f"{k}: {round(v,2)}" for k, v in epoch_metrics.items())
                 msg += " | Batch Processing "
                 pbar.set_description(msg)
 
@@ -299,7 +293,6 @@ def main():
 
             # Save the model
             torch.save({"optimizer": optimizer.state_dict(), "model": model.state_dict(), "epoch": epoch}, args.checkpoint_path)
-
         # close logging utility
         csv_logger_file.close()
         if args.use_mlflow:
