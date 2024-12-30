@@ -8,6 +8,7 @@ Train a model using the [Fashion-MNIST dataset](https://github.com/zalandoresear
 - [Installation](#installation)
 - [Usage](#usage)
 - [Development Notes](#development-notes)
+- [Experiments](#experiments)
 
 ## Installation
 
@@ -90,3 +91,18 @@ Train a model using the [Fashion-MNIST dataset](https://github.com/zalandoresear
     ruff check --fix
     ruff format
     ```
+
+## Experiments
+
+- Understanding impact of learning rate
+  ```bash
+  ./experiments/lr_experiment.sh
+  ```
+- Understanding impact of network choice (cnn vs fnn)
+  ```bash
+  ./experiments/cnn_experiment.sh
+  ```
+- Understanding impact of optimizer (adam vs sgd)
+  ```bash
+  ./experiments/optim.sh
+  ```
