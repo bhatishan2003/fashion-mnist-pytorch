@@ -104,5 +104,5 @@ Train a model using the [Fashion-MNIST dataset](https://github.com/zalandoresear
   ```
 - Understanding impact of optimizer (adam vs sgd)
   ```bash
-  ./experiments/optim.sh
+  ./experiments/optim_experiment.sh
   ```
