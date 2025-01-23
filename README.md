@@ -106,3 +106,7 @@ Train a model using the [Fashion-MNIST dataset](https://github.com/zalandoresear
   ```bash
   ./experiments/optim_experiment.sh
   ```
+- Understanding impact of normalization (true vs false)
+  ```bash
+  ./experiments/disable_norm_experiment.sh
+  ```
