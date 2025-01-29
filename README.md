@@ -100,7 +100,7 @@ Train a model using the [Fashion-MNIST dataset](https://github.com/zalandoresear
   ./experiments/lr_experiment.sh
   ```
 
-  ![Impact of learning rate](assets\experiement_results\learning-rate-experiment.png)
+  ![Impact of learning rate](assets/experiement_results/learning-rate-experiment.png)
 
 - Understanding impact of network choice (cnn vs fnn)
 
@@ -108,13 +108,13 @@ Train a model using the [Fashion-MNIST dataset](https://github.com/zalandoresear
   ./experiments/cnn_experiment.sh
   ```
 
-  ![Impact of model type](assets\experiement_results\model-type-experiement.png)
+  ![Impact of model type](assets/experiement_results/model-type-experiement.png)
 
 - Understanding impact of optimizer (adam vs sgd)
   ```bash
   ./experiments/optim_experiment.sh
   ```
-  ![Impact of optimizer type](assets\experiement_results\optimizer-comparison-experiment.png)
+  ![Impact of optimizer type](assets/experiement_results/optimizer-comparison-experiment.png)
 - Understanding impact of normalization (true vs false)
   ```bash
   ./experiments/disable_norm_experiment.sh
