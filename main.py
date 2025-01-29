@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as transforms
+from sklearn.metrics import f1_score, precision_score, recall_score
 from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 
@@ -37,6 +38,9 @@ def evaluate(data_loader, model, device="cpu"):
     return {
         "loss": np.mean(losses),
         "accuracy": np.mean(np.array(predicted_labels) == np.array(target_labels)),
+        "precision": precision_score(target_labels, predicted_labels, average="macro"),
+        "recall": recall_score(target_labels, predicted_labels, average="macro"),
+        "f1_score": f1_score(target_labels, predicted_labels, average="macro"),
     }
 
 
@@ -235,7 +239,9 @@ def main():
         else:
             csv_logger_file = open(logs_path, "w", newline="")
             csv_logger_writer = csv.writer(csv_logger_file)
-            csv_logger_writer.writerow(["Epoch", "Train Loss", "Val Loss", "Val Accuracy"])
+            csv_logger_writer.writerow(
+                ["Epoch", "Train Loss", "Val Loss", "Val Accuracy", "Val Precision", "Val Recall", "Val F1-Score"]
+            )
 
         # resume experiment
         epoch_start_num = 0
@@ -294,7 +300,15 @@ def main():
 
                 # write metrics to csv
                 csv_logger_writer.writerow(
-                    [epoch, epoch_metrics["train-loss"], epoch_metrics["val-loss"], epoch_metrics["val-accuracy"]]
+                    [
+                        epoch,
+                        epoch_metrics["train-loss"],
+                        epoch_metrics["val-loss"],
+                        epoch_metrics["val-accuracy"],
+                        epoch_metrics["val-precision"],
+                        epoch_metrics["val-recall"],
+                        epoch_metrics["val-f1_score"],
+                    ]
                 )
 
             # Save the model
@@ -315,6 +329,9 @@ def main():
         print(
             f"Test Loss: {test_metrics['loss']:.4f}",
             f"Test Accuracy: {test_metrics['accuracy']:.4f}",
+            f"Test Precision: {test_metrics['precision']:.4f}",
+            f"Test Recall: {test_metrics['recall']:.4f}",
+            f"Test F1-Score: {test_metrics['f1_score']:.4f}",
         )
 
     else:
